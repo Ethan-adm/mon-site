@@ -43,4 +43,4 @@ jobs:
 
       - name: Lancer les tests unitaires (fichiers modifiés uniquement)
         working-directory: ./backend
-        run: npx jest --changedSince=origin/main --passWithNoTests --forceExit
+        run: npm run test -- --changedSince=origin/main --passWithNoTests
