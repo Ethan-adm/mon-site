@@ -31,9 +31,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Installer les dépendances du backend
-        working-directory: ./backend
-        run: npm install
+      - - name: Installer les dépendances du backend
+          working-directory: ./backend
+          run: |
+            rm -rf node_modules
+            npm install
 
       - name: Vérifier la syntaxe (fichiers modifiés uniquement)
         working-directory: ./backend
