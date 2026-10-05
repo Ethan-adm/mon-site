@@ -11,8 +11,8 @@ app.use(express.json());
 
 // Connexion à la base de données MariaDB/MySQL locale (sans Docker)
 const db = mysql.createPool({
-    host: 'localhost', // L'adresse redevient localhost puisque nous n'utilisons plus de conteneur
-    user: 'monuser',   // À adapter avec les identifiants de ton serveur MariaDB local
+    host: '127.0.0.1', // On utilise l'IP explicite pour forcer le mode réseau (TCP)
+    user: 'monuser',
     password: 'monpassword',
     database: 'mabase',
     waitForConnections: true,
