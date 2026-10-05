@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mon Planning Kanban</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f8; margin: 0; padding: 20px; }
+        h1 { text-align: center; color: #333; font-size: 2.5em; margin-bottom: 5px; font-family: 'Georgia', serif; }
+        .date-header { text-align: center; color: #666; margin-bottom: 30px; font-style: italic; }
+
+        .input-section { text-align: center; margin-bottom: 30px; }
+        input { padding: 12px; width: 50%; border: 1px solid #ccc; border-radius: 20px; outline: none; }
+        button.add-btn { padding: 12px 25px; cursor: pointer; background-color: #333; color: white; border: none; border-radius: 20px; margin-left: 10px; font-weight: bold; }
+
+        /* Structure des colonnes Kanban */
+        .board { display: flex; gap: 20px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+        .column { flex: 1; min-width: 280px; background: white; border-radius: 10px; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 400px; display: flex; flex-direction: column; }
+
+        /* Couleurs du Planning */
+        #todo { border-top: 5px solid #ffb3ba; background-color: #fff9f9; } /* Rose */
+        #priority { border-top: 5px solid #bae1ff; background-color: #f4faff; } /* Bleu */
+        #in_progress { border-top: 5px solid #baffc9; background-color: #f4fff7; } /* Vert */
+
+        .column h2 { text-align: center; font-size: 1.2em; color: #444; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+
+        .task-list { flex-grow: 1; padding: 0; margin: 0; list-style-type: none; min-height: 50px; }
+        
+        /* Design des cartes */
+        .task { background: white; margin: 10px 0; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; cursor: grab; border-left: 4px solid #ddd; transition: transform 0.2s; }
+        .task:active { cursor: grabbing; transform: scale(0.98); }
+
+        #todo .task { border-left-color: #ffb3ba; }
+        #priority .task { border-left-color: #bae1ff; }
+        #in_progress .task { border-left-color: #baffc9; }
+
+        .delete-btn { background-color: transparent; color: #dc3545; border: none; cursor: pointer; font-weight: bold; font-size: 1.2em; }
+        .delete-btn:hover { color: #a71d2a; }
+    </style>
+</head>
+<body>
+    <h1>Planning du Jour</h1>
+    <div class="date-header" id="dateDisplay"></div>
+
+    <div class="input-section">
+        <input type="text" id="taskInput" placeholder="Ajouter une nouvelle tâche...">
+        <button class="add-btn" onclick="addTask()">Ajouter</button>
+    </div>
+
+    <!-- Le Tableau Kanban -->
+    <div class="board">
+        <div class="column" id="todo" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <h2>To Do</h2>
+            <ul class="task-list" id="list-todo"></ul>
+        </div>
+        <div class="column" id="priority" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <h2>Priorités</h2>
+            <ul class="task-list" id="list-priority"></ul>
+        </div>
+        <div class="column" id="in_progress" ondrop="drop(event)" ondragover="allowDrop(event)">
+            <h2>En Cours</h2>
+            <ul class="task-list" id="list-in_progress"></ul>
+        </div>
+    </div>
+
+    <script>
+        // Afficher la date du jour automatiquement
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('dateDisplay').textContent = new Date().toLocaleDateString('fr-FR', options);
+
+        // L'adresse du Backend (TRÈS IMPORTANT pour l'architecture séparée)
+        const BACKEND_URL = 'http://localhost:3000';
+
+        // Charger et trier les tâches dans les bonnes colonnes
+        async function loadTasks() {
+            const response = await fetch(`${BACKEND_URL}/api/tasks`);
+            const tasks = await response.json();
+
+            document.getElementById('list-todo').innerHTML = '';
+            document.getElementById('list-priority').innerHTML = '';
+            document.getElementById('list-in_progress').innerHTML = '';
+
+            tasks.forEach(task => {
+                const li = document.createElement('li');
+                li.className = 'task';
+                li.draggable = true; 
+                li.id = 'task-' + task.id;
+                li.ondragstart = drag;
+
+                li.innerHTML = `
+                    <span>${task.title}</span>
+                    <button class="delete-btn" onclick="deleteTask(${task.id})">✖</button>
+                `;
+
+                // Insère la tâche dans la colonne correspondant à son statut
+                const targetList = document.getElementById('list-' + task.status) || document.getElementById('list-todo');
+                targetList.appendChild(li);
+            });
+        }
+
+        // Ajouter une tâche (par défaut dans "To Do")
+        async function addTask() {
+            const input = document.getElementById('taskInput');
+            const title = input.value;
+            if (title.trim() === '') return;
+
+            await fetch(`${BACKEND_URL}/api/tasks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: title, status: 'todo' }) 
+            });
+
+            input.value = '';
+            loadTasks();
+        }
+
+        // Supprimer une tâche
+        async function deleteTask(id) {
+            await fetch(`${BACKEND_URL}/api/tasks/${id}`, { method: 'DELETE' });
+            loadTasks();
+        }
+
+        // --- FONCTIONS POUR LE GLISSER-DÉPOSER ---
+        function allowDrop(ev) {
+            ev.preventDefault(); 
+        }
+
+        function drag(ev) {
+            const taskId = ev.target.id.split('-')[1];
+            ev.dataTransfer.setData("taskId", taskId);
+        }
+
+        async function drop(ev) {
+            ev.preventDefault();
+            const taskId = ev.dataTransfer.getData("taskId");
+
+            let dropZone = ev.target;
+            while (!dropZone.classList.contains('column') && dropZone !== document.body) {
+                dropZone = dropZone.parentElement;
+            }
+
+            if (dropZone.classList.contains('column')) {
+                const newStatus = dropZone.id; 
+
+                // Prévient le backend du changement de colonne
+                await fetch(`${BACKEND_URL}/api/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                loadTasks(); 
+            }
+        }
+
+        // Charger les tâches au démarrage
+        loadTasks();
+    </script>
+</body>
+</html>
