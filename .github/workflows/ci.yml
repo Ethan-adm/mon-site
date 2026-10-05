@@ -7,6 +7,20 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+
+    # Création d'une base de données temporaire pour la CI
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MYSQL_DATABASE: mabase
+          MYSQL_USER: monuser
+          MYSQL_PASSWORD: monpassword
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=10s --health-timeout=5s --health-retries=3
+
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
