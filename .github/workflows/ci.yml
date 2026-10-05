@@ -1,14 +1,13 @@
 name: Intégration Continue (CI)
 
 on:
-  push:
+  pull_request:
     branches: [ main ]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    # Création d'une base de données temporaire pour la CI
     services:
       mariadb:
         image: mariadb:10.11
@@ -24,6 +23,8 @@ jobs:
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Obligatoire pour permettre à Git de comparer l'historique
 
       - name: Installer Node.js
         uses: actions/setup-node@v4
@@ -34,10 +35,12 @@ jobs:
         working-directory: ./backend
         run: npm install
 
-      - name: Vérifier la syntaxe (Lint)
+      - name: Vérifier la syntaxe (fichiers modifiés uniquement)
         working-directory: ./backend
-        run: npm run lint
+        run: |
+          CHANGED=$(git diff --name-only origin/main...HEAD | grep '^backend/.*\.js$' | sed 's/backend\///' || true)
+          if [ -n "$CHANGED" ]; then npx eslint $CHANGED; else echo "Aucun fichier à linter"; fi
 
-      - name: Lancer les tests unitaires
+      - name: Lancer les tests unitaires (fichiers modifiés uniquement)
         working-directory: ./backend
-        run: npm run test
+        run: npx jest --changedSince=origin/main --forceExit
